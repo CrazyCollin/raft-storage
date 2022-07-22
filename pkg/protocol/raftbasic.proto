@@ -1,0 +1,80 @@
+syntax="proto3";
+
+package protocol;
+
+option go_package="../protocol";
+
+message RequestVoteReq{
+  int64 term=1;
+  int64 candidate_id=2;
+  int64 last_log_index=3;
+  int64 last_log_term=4;
+}
+
+
+message RequestVoteResp{
+  int64 term=1;
+  bool vote_granted=2;
+}
+
+//  Normal:crud请求
+//  ConfChange:集群配置改变
+enum EntryType{
+  EntryNormal=0;
+  EntryConfChange=1;
+}
+
+//  raft log的基本定义
+message Entry{
+  EntryType entry_type=1;
+  uint64 term=2;
+  int64 index=3;
+  bytes data=4;
+}
+
+message AppendEntriesReq{
+  int64 term=1;
+  int64 leader_id=2;
+  int64 prev_log_index=3;
+  int64 prev_log_term=4;
+  int64 leader_commit=5;
+  repeated Entry entries=6;
+}
+
+message AppendEntriesResp{
+  int64 term=1;
+  bool success=2;
+  int64 conflict_index=3;
+  int64 conflict_term=4;
+}
+
+message ApplyMsg{
+  bool CommandValid=1;
+  bytes Command=2;
+  int64 CommandTerm=3;
+  int64 CommandIndex=4;
+  bool SnapshotValid=5;
+  bytes Snapshot=6;
+  int64 SnapshotTerm=7;
+  int64 SnapshotIndex=8;
+}
+
+message InstallSnapshotReq{
+  int64 term=1;
+  int64 leader_id=2;
+  int64 last_included_index=3;
+  int64 last_included_term=4;
+  bytes data=5;
+}
+
+message InstallSnapshotResp{
+  int64 term=1;
+}
+
+//  raft相关服务
+service RaftService{
+  rpc RequestVote(RequestVoteReq)returns(RequestVoteResp){}
+  rpc AppendEntries(AppendEntriesReq)returns(AppendEntriesResp){}
+  rpc Snapshot(InstallSnapshotReq)returns(InstallSnapshotResp){}
+}
+
