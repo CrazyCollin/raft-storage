@@ -1,9 +1,9 @@
 package raft
 
 import (
-	"CrazyCollin/personalProjects/raft-db/pkg/log"
-	"CrazyCollin/personalProjects/raft-db/pkg/protocol"
 	"google.golang.org/grpc"
+	"rstorage/pkg/log"
+	"rstorage/pkg/protocol"
 )
 
 type RaftClientEnd struct {

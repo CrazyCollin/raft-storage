@@ -1,8 +1,8 @@
 package raft
 
 import (
-	"CrazyCollin/personalProjects/raft-db/pkg/engine"
-	"CrazyCollin/personalProjects/raft-db/pkg/protocol"
+	"rstorage/pkg/engine"
+	"rstorage/pkg/protocol"
 	"sync"
 )
 

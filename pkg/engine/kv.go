@@ -1,6 +1,6 @@
 package engine
 
-import "CrazyCollin/personalProjects/raft-db/pkg/log"
+import "rstorage/pkg/log"
 
 type KvStore interface {
 	Put(key []byte, val []byte) error

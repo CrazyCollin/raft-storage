@@ -1,12 +1,15 @@
 package raft
 
 import (
-	"CrazyCollin/personalProjects/raft-db/pkg/protocol"
+	"rstorage/pkg/engine"
+	"rstorage/pkg/protocol"
 	"sync"
 	"time"
 )
 
 type RAFTROLE uint8
+
+const None int64 = -1
 
 const (
 	FOLLOWER RAFTROLE = iota
@@ -29,7 +32,7 @@ func RoleToString(role RAFTROLE) string {
 type Raft struct {
 	mu sync.RWMutex
 	//rpc客户端
-	peers *[]RaftClientEnd
+	peers []*RaftClientEnd
 	//自己的id
 	me int
 	//节点状态
@@ -74,4 +77,31 @@ type Raft struct {
 	heartbeatTimeout uint64
 	//选举超时时间
 	electionTimeout uint64
+}
+
+func BuildRaft(peers []*RaftClientEnd, me int, db engine.KvStore, applyCh chan *protocol.ApplyMsg, heartbeatTimeout uint64, electionTimeout uint64) *Raft {
+	raft := &Raft{
+		peers:          peers,
+		me:             me,
+		dead:           0,
+		applyCh:        applyCh,
+		replicatorCond: make([]*sync.Cond, len(peers)),
+		role:           FOLLOWER,
+		currTerm:       0,
+		voteFor:        None,
+		grantedVotes:   0,
+		logs:,
+		persister: ,
+		commitIdx: 0,
+		lastApplied: 0,
+		nextIdx: make([]int,len(peers)),
+		matchIdx: make([]int,len(peers)),
+		heartbeatTimer: ,
+		electionTimer:,
+		heartbeatTimeout: heartbeatTimeout,
+		electionTimeout: electionTimeout,
+	}
+	raft.applyCond=sync.NewCond(&raft.mu)
+
+	return raft
 }

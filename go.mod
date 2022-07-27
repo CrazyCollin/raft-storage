@@ -1,4 +1,4 @@
-module CrazyCollin/personalProjects/raft-db
+module rstorage
 
 go 1.17
 
