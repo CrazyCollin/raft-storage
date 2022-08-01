@@ -4,6 +4,7 @@ import (
 	"rstorage/pkg/engine"
 	"rstorage/pkg/protocol"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -105,7 +106,7 @@ func BuildRaft(peers []*RaftClientEnd, me int, db engine.KvStore, applyCh chan *
 		electionTimeout:  electionTimeout,
 	}
 	raft.applyCond = sync.NewCond(&raft.mu)
-
+	go raft.Ticker()
 	return raft
 }
 
@@ -115,11 +116,14 @@ func BuildRaft(peers []*RaftClientEnd, me int, db engine.KvStore, applyCh chan *
 // @receiver r
 //
 func (r *Raft) Ticker() {
-	for r.dead != 1 {
+	for !r.IsDead() {
 		select {
 		case <-r.electionTimer.C:
 			r.mu.Lock()
 			//todo 开始选举 follower->candidate
+			r.IncrCurrTerm()
+			r.SwitchRole(CANDIDATE)
+			r.StartElection()
 			r.mu.Unlock()
 		case <-r.heartbeatTimer.C:
 			if r.role == LEADER {
@@ -140,4 +144,29 @@ func (r *Raft) SendHeartbeat() {
 		}
 		//todo 保持心跳
 	}
+}
+
+func (r *Raft) IsDead() bool {
+	return atomic.LoadInt32(&r.dead) == 1
+}
+
+// SwitchRole
+// @Description: 改变当前节点角色
+// @receiver r
+// @param role
+//
+func (r *Raft) SwitchRole(role ROLE) {
+	if r.role == role {
+		return
+	}
+	r.role = role
+	switch role {
+	case FOLLOWER:
+	case CANDIDATE:
+	case LEADER:
+	}
+}
+
+func (r *Raft) IncrCurrTerm() {
+	atomic.AddInt64(&r.currTerm, 1)
 }
