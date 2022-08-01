@@ -47,6 +47,7 @@ type Raft struct {
 	//节点当前状态
 	role ROLE
 
+	//持久性状态
 	//当前任期
 	currTerm int64
 	//为哪个节点投票

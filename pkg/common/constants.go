@@ -1,0 +1,3 @@
+package common
+
+var RAFTLOG_PREFIX = []byte{0x11, 0x11, 0x19, 0x96}
