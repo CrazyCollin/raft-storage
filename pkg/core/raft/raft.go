@@ -84,7 +84,7 @@ type Raft struct {
 	electionTimeout uint64
 }
 
-func BuildRaft(peers []*RaftClientEnd, me int, db engine.KvStore, applyCh chan *protocol.ApplyMsg, heartbeatTimeout uint64, electionTimeout uint64) *Raft {
+func BuildRaft(peers []*RaftClientEnd, me int, dbEngine engine.KvStore, applyCh chan *protocol.ApplyMsg, heartbeatTimeout uint64, electionTimeout uint64) *Raft {
 	raft := &Raft{
 		peers:            peers,
 		me:               me,
@@ -95,8 +95,8 @@ func BuildRaft(peers []*RaftClientEnd, me int, db engine.KvStore, applyCh chan *
 		currTerm:         0,
 		voteFor:          None,
 		grantedVotes:     0,
-		logs:             nil,
-		persister:        nil,
+		logs:             BuildPersistentRaftLog(dbEngine),
+		persister:        BuildPersistentRaftLog(dbEngine),
 		commitIdx:        0,
 		lastApplied:      0,
 		nextIdx:          make([]int, len(peers)),

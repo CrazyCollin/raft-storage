@@ -19,7 +19,7 @@ func EncodeRaftLogKey(index uint64) []byte {
 	byteBuffer.Write(common.RAFTLOG_PREFIX)
 	data := make([]byte, 8)
 	binary.BigEndian.PutUint64(data, index)
-	byteBuffer.Write(common.RAFTLOG_PREFIX)
+	byteBuffer.Write(data)
 	return byteBuffer.Bytes()
 }
 
@@ -58,4 +58,18 @@ func DecodeEntry(dataBytes []byte) *protocol.Entry {
 	entry := &protocol.Entry{}
 	_ = decoder.Decode(entry)
 	return entry
+}
+
+func EncodeRaftState(raftState *StateOfRaftLog) []byte {
+	var byteBuffer bytes.Buffer
+	encoder := gob.NewEncoder(&byteBuffer)
+	_ = encoder.Encode(raftState)
+	return byteBuffer.Bytes()
+}
+
+func DecodeRaftState(dataBytes []byte) *StateOfRaftLog {
+	decoder := gob.NewDecoder(bytes.NewBuffer(dataBytes))
+	state := &StateOfRaftLog{}
+	_ = decoder.Decode(state)
+	return state
 }
