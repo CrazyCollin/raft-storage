@@ -9,6 +9,10 @@ import (
 	"rstorage/pkg/log"
 )
 
+//
+// KvStoreLevelDB
+// @Description: 封装leveldb存储引擎
+//
 type KvStoreLevelDB struct {
 	path string
 	db   *leveldb.DB
@@ -51,7 +55,7 @@ func (k *KvStoreLevelDB) GetPrefixRangeKvs(prefix []byte) ([]string, []string, e
 	vals := make([]string, 0)
 	iter := k.db.NewIterator(util.BytesPrefix(prefix), nil)
 	for iter.Next() {
-		log.MainLogger.Debug().Msgf("iter key:%v,val:%v", iter.Key(), iter.Value())
+		log.Log.Infof("iter key:%v,val:%v", iter.Key(), iter.Value())
 		keys = append(keys, string(iter.Key()))
 		vals = append(vals, string(iter.Value()))
 	}

@@ -16,7 +16,7 @@ type RaftClientEnd struct {
 func NewRaftClientEnd(id uint64, addr string) *RaftClientEnd {
 	conn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
-		log.MainLogger.Error().Msgf("failed to connect:%v", err)
+		log.Log.Errorf("failed to connect:%v", err)
 	}
 	conns := []*grpc.ClientConn{}
 	conns = append(conns, conn)

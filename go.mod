@@ -6,6 +6,7 @@ require (
 	// github.com/vmware/go-pmem-transaction v0.0.0-20210401173707-6e2b76e1a20d
 	google.golang.org/grpc v1.46.0
 	google.golang.org/protobuf v1.28.0
+	github.com/sirupsen/logrus v1.8.1
 )
 
 require (

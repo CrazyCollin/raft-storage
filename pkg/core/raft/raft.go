@@ -7,17 +7,17 @@ import (
 	"time"
 )
 
-type RAFTROLE uint8
+type ROLE uint8
 
 const None int64 = -1
 
 const (
-	FOLLOWER RAFTROLE = iota
+	FOLLOWER ROLE = iota
 	CANDIDATE
 	LEADER
 )
 
-func RoleToString(role RAFTROLE) string {
+func RoleToString(role ROLE) string {
 	switch role {
 	case FOLLOWER:
 		return "Follower"
@@ -44,7 +44,7 @@ type Raft struct {
 	//复制操作控制的信号量
 	replicatorCond []*sync.Cond
 	//节点当前状态
-	role RAFTROLE
+	role ROLE
 
 	//当前任期
 	currTerm int64
@@ -57,10 +57,13 @@ type Raft struct {
 	//日志持久化
 	persister *RaftLog
 
+	//所有服务器上的易失性状态
 	//已经提交的最大日志id
 	commitIdx int64
 	//已经applied的最大日志id
 	lastApplied int64
+
+	//leader上的易失性状态
 	//leader节点到其他节点下一个匹配的日志id信息
 	nextIdx []int
 	//leader节点到其他节点当前匹配的日志id信息
@@ -81,27 +84,60 @@ type Raft struct {
 
 func BuildRaft(peers []*RaftClientEnd, me int, db engine.KvStore, applyCh chan *protocol.ApplyMsg, heartbeatTimeout uint64, electionTimeout uint64) *Raft {
 	raft := &Raft{
-		peers:          peers,
-		me:             me,
-		dead:           0,
-		applyCh:        applyCh,
-		replicatorCond: make([]*sync.Cond, len(peers)),
-		role:           FOLLOWER,
-		currTerm:       0,
-		voteFor:        None,
-		grantedVotes:   0,
-		logs:,
-		persister: ,
-		commitIdx: 0,
-		lastApplied: 0,
-		nextIdx: make([]int,len(peers)),
-		matchIdx: make([]int,len(peers)),
-		heartbeatTimer: ,
-		electionTimer:,
+		peers:            peers,
+		me:               me,
+		dead:             0,
+		applyCh:          applyCh,
+		replicatorCond:   make([]*sync.Cond, len(peers)),
+		role:             FOLLOWER,
+		currTerm:         0,
+		voteFor:          None,
+		grantedVotes:     0,
+		logs:             nil,
+		persister:        nil,
+		commitIdx:        0,
+		lastApplied:      0,
+		nextIdx:          make([]int, len(peers)),
+		matchIdx:         make([]int, len(peers)),
+		heartbeatTimer:   nil,
+		electionTimer:    nil,
 		heartbeatTimeout: heartbeatTimeout,
-		electionTimeout: electionTimeout,
+		electionTimeout:  electionTimeout,
 	}
-	raft.applyCond=sync.NewCond(&raft.mu)
+	raft.applyCond = sync.NewCond(&raft.mu)
 
 	return raft
+}
+
+//
+// Ticker
+// @Description: 处理选举超时和心跳超时
+// @receiver r
+//
+func (r *Raft) Ticker() {
+	for r.dead != 1 {
+		select {
+		case <-r.electionTimer.C:
+			r.mu.Lock()
+			//todo 开始选举 follower->candidate
+			r.mu.Unlock()
+		case <-r.heartbeatTimer.C:
+			if r.role == LEADER {
+				r.SendHeartbeat()
+			}
+		}
+	}
+}
+
+func (r *Raft) StartElection() {
+	//todo 开始新一轮选举
+}
+
+func (r *Raft) SendHeartbeat() {
+	for _, peer := range r.peers {
+		if int(peer.id) == r.me {
+			continue
+		}
+		//todo 保持心跳
+	}
 }

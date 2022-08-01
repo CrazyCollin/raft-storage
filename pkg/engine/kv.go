@@ -19,7 +19,7 @@ func KvStoreFactory(engineName string, path string) KvStore {
 	case "levelDB":
 		db, err := BuildLevelDBKvStore(path)
 		if err != nil {
-			log.MainLogger.Error().Msgf("build leveldb error")
+			log.Log.Error("build leveldb error")
 			panic(err)
 		}
 		return db
