@@ -6,6 +6,11 @@ import (
 	"rstorage/pkg/protocol"
 )
 
+//
+// StartElection
+// @Description: 当前节点发起选举
+// @receiver r
+//
 func (r *Raft) StartElection() {
 	//todo 开始新一轮选举
 	log.Log.Debugf("node-%d-:start a new election", r.me)
@@ -64,4 +69,57 @@ func (r *Raft) StartElection() {
 			}
 		}(peer)
 	}
+}
+
+//
+// HandleRequestVote
+// @Description: 处理选举请求etcd
+// @receiver r
+// @param request
+// @param resp
+//
+func (r *Raft) HandleRequestVote(request *protocol.RequestVoteReq, resp *protocol.RequestVoteResp) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	log.Log.Debugf("node-%d-start to handle a vote request from peer", r.me)
+
+	//查看和当前节点的log相比，进行选举的log是否更新
+	expired := r.CheckDataExpired(request.LastLogIndex, request.LastLogTerm)
+	//满足之前投的票就是当前请求的节点，或者是没有给其他节点投过票，或者请求消息的term比当前节点的任期要大
+	canVote := r.voteFor == request.CandidateId || (r.voteFor == None && r.leaderId == None) || request.Term > r.currTerm
+
+	if expired && canVote {
+		//可以投票，赞成
+		resp.Term, resp.VoteGranted = r.currTerm, true
+	} else {
+		//不能投赞成票
+		resp.Term, resp.VoteGranted = r.currTerm, false
+		return
+	}
+	r.voteFor = request.CandidateId
+	//todo 重置选举计时器
+}
+
+//
+// CheckDataExpired
+// @Description: 检查当前节点日志状态是否过期，已过期则返回true，总要保证选举节点是最新状态
+// @receiver r
+// @param lastIdx
+// @param term
+// @return bool
+//
+func (r *Raft) CheckDataExpired(lastIdx, term int64) bool {
+	lastEntry := r.logs.GetLastEntry()
+	var dataIsExpired bool
+	//请求的任期较大
+	if term > int64(lastEntry.GetTerm()) {
+		dataIsExpired = true
+		return dataIsExpired
+	}
+	//请求的任期和目前相等，但log更加新
+	if term == int64(lastEntry.GetTerm()) && lastIdx >= lastEntry.GetIndex() {
+		dataIsExpired = true
+		return dataIsExpired
+	}
+	return dataIsExpired
 }
