@@ -2,6 +2,7 @@ package raft
 
 import (
 	"rstorage/pkg/engine"
+	"rstorage/pkg/log"
 	"rstorage/pkg/protocol"
 	"sync"
 	"sync/atomic"
@@ -136,6 +137,16 @@ func (r *Raft) Ticker() {
 
 func (r *Raft) StartElection() {
 	//todo 开始新一轮选举
+	log.Log.Debugf("node-%d-:start a new election", r.me)
+	r.grantedVotes = 1
+	r.voteFor = int64(r.me)
+	requestVote := &protocol.RequestVoteReq{
+		Term:         r.currTerm,
+		CandidateId:  int64(r.me),
+		LastLogIndex: r.logs.GetLastEntry().Index,
+		LastLogTerm:  int64(r.logs.GetLastEntry().Term),
+	}
+
 }
 
 func (r *Raft) SendHeartbeat() {

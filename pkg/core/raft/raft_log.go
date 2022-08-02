@@ -25,54 +25,52 @@ func BuildRaftLog() *RaftLog {
 	}
 }
 
-func (l *RaftLog) GetFirst() *protocol.Entry {
+func (l *RaftLog) GetMemFirst() *protocol.Entry {
 	return l.items[0]
 }
 
-func (l *RaftLog) GetLast() *protocol.Entry {
+func (l *RaftLog) GetMemLast() *protocol.Entry {
 	return l.items[len(l.items)-1]
 }
 
-func (l *RaftLog) AppendEntry(entry *protocol.Entry) {
+func (l *RaftLog) AppendMemEntry(entry *protocol.Entry) {
 	l.items = append(l.items, entry)
 }
 
-func (l *RaftLog) GetEntry(index int) *protocol.Entry {
+func (l *RaftLog) GetMemEntry(index int) *protocol.Entry {
 	return l.items[index]
 }
 
-//
-// GetBeforeIdx
+// GetMemBeforeIdx
 // @Description: 获取index及之前的entry
 // @receiver l
 // @param index
 // @return []*protocol.Entry
 //
-func (l *RaftLog) GetBeforeIdx(index int) []*protocol.Entry {
+func (l *RaftLog) GetMemBeforeIdx(index int) []*protocol.Entry {
 	return l.items[:index+1]
 }
 
-func (l *RaftLog) GetAfterIdx(index int) []*protocol.Entry {
+func (l *RaftLog) GetMemAfterIdx(index int) []*protocol.Entry {
 	return l.items[index:]
 }
 
-func (l *RaftLog) GetRangeEntries(first, last int) []*protocol.Entry {
+func (l *RaftLog) GetMemRangeEntries(first, last int) []*protocol.Entry {
 	return l.items[first : last+1]
 }
 
-//
-// DelBeforeIdx
+// DelMemBeforeIdx
 // @Description: 将index及之前的entry删掉
 // @receiver l
 // @param index
 // @return []*protocol.Entry
 //
-func (l *RaftLog) DelBeforeIdx(index int) []*protocol.Entry {
+func (l *RaftLog) DelMemBeforeIdx(index int) []*protocol.Entry {
 	l.items = l.items[:index+1]
 	return l.items
 }
 
-func (l *RaftLog) DelAfterIdx(index int) []*protocol.Entry {
+func (l *RaftLog) DelMemAfterIdx(index int) []*protocol.Entry {
 	l.items = l.items[index:]
 	return l.items
 }

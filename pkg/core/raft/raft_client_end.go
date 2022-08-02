@@ -18,7 +18,7 @@ func NewRaftClientEnd(id uint64, addr string) *RaftClientEnd {
 	if err != nil {
 		log.Log.Errorf("failed to connect:%v", err)
 	}
-	conns := []*grpc.ClientConn{}
+	var conns []*grpc.ClientConn
 	conns = append(conns, conn)
 	rpcClient := protocol.NewRaftServiceClient(conn)
 	return &RaftClientEnd{
