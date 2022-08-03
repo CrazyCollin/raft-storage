@@ -54,7 +54,7 @@ func (r *Raft) StartElection() {
 						//获得集群1/2节点的选举，选举成功，开始转换角色
 						if r.grantedVotes > len(r.peers)/2 {
 							r.SwitchRole(LEADER)
-							r.SendHeartbeat()
+							r.Broadcast(true)
 							r.grantedVotes = 0
 							log.Log.Debugf("node-%d-become a new leader in cluster", r.me)
 						}

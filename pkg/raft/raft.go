@@ -128,21 +128,16 @@ func (r *Raft) Ticker() {
 			r.mu.Unlock()
 		case <-r.heartbeatTimer.C:
 			if r.role == LEADER {
-				r.SendHeartbeat()
+				r.Broadcast(true)
 			}
 		}
 	}
 }
 
-func (r *Raft) SendHeartbeat() {
-	for _, peer := range r.peers {
-		if int(peer.id) == r.me {
-			continue
-		}
-		//todo 保持心跳
-	}
-}
-
+//
+// IsDead
+// @Description: 如果已dead返回true
+//
 func (r *Raft) IsDead() bool {
 	return atomic.LoadInt32(&r.dead) == 1
 }
@@ -170,4 +165,8 @@ func (r *Raft) IncrCurrTerm() {
 
 func (r *Raft) IncrGrantedVotes() {
 	r.grantedVotes += 1
+}
+
+func (r *Raft) PersistState() {
+	r.persister.PersistStateOfRaftLog(r.currTerm, r.voteFor)
 }
