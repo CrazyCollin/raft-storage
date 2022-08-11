@@ -3,14 +3,14 @@ package raft
 import (
 	"google.golang.org/grpc"
 	"rstorage/pkg/log"
-	"rstorage/pkg/protocol"
+	pb "rstorage/pkg/protocol"
 )
 
 type RaftClientEnd struct {
 	id             uint64
 	addr           string
 	conns          []*grpc.ClientConn
-	raftServiceCli *protocol.RaftServiceClient
+	raftServiceCli *pb.RaftServiceClient
 }
 
 func NewRaftClientEnd(id uint64, addr string) *RaftClientEnd {
@@ -20,7 +20,7 @@ func NewRaftClientEnd(id uint64, addr string) *RaftClientEnd {
 	}
 	var conns []*grpc.ClientConn
 	conns = append(conns, conn)
-	rpcClient := protocol.NewRaftServiceClient(conn)
+	rpcClient := pb.NewRaftServiceClient(conn)
 	return &RaftClientEnd{
 		id:             id,
 		addr:           addr,
@@ -33,7 +33,7 @@ func (rce *RaftClientEnd) Id() uint64 {
 	return rce.id
 }
 
-func (rce *RaftClientEnd) GetRaftServiceCli() *protocol.RaftServiceClient {
+func (rce *RaftClientEnd) GetRaftServiceCli() *pb.RaftServiceClient {
 	return rce.raftServiceCli
 }
 

@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"rstorage/pkg/common"
-	"rstorage/pkg/protocol"
+	pb "rstorage/pkg/protocol"
 )
 
 //
@@ -40,7 +40,7 @@ func DecodeRaftLogKey(dataBytes []byte) uint64 {
 // @param entry
 // @return []byte
 //
-func EncodeEntry(entry *protocol.Entry) []byte {
+func EncodeEntry(entry *pb.Entry) []byte {
 	var byteBuffer bytes.Buffer
 	encoder := gob.NewEncoder(&byteBuffer)
 	_ = encoder.Encode(entry)
@@ -53,9 +53,9 @@ func EncodeEntry(entry *protocol.Entry) []byte {
 // @param dataBytes
 // @return *protocol.Entry
 //
-func DecodeEntry(dataBytes []byte) *protocol.Entry {
+func DecodeEntry(dataBytes []byte) *pb.Entry {
 	decoder := gob.NewDecoder(bytes.NewBuffer(dataBytes))
-	entry := &protocol.Entry{}
+	entry := &pb.Entry{}
 	_ = decoder.Decode(entry)
 	return entry
 }

@@ -2,7 +2,7 @@ package raft
 
 import (
 	"rstorage/pkg/engine"
-	"rstorage/pkg/protocol"
+	pb "rstorage/pkg/protocol"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -39,7 +39,7 @@ type Raft struct {
 	//节点状态
 	dead int32
 	//apply协程通道
-	applyCh chan *protocol.ApplyMsg
+	applyCh chan *pb.ApplyMsg
 	//apply流程控制的信号量
 	applyCond *sync.Cond
 	//复制操作控制的信号量
@@ -66,7 +66,7 @@ type Raft struct {
 	lastApplied int64
 
 	//leader上的易失性状态
-	//leader节点到其他节点下一个匹配的日志id信息
+	//leader节点到其他节点下一个匹配的日志index信息
 	nextIdx []int
 	//leader节点到其他节点当前匹配的日志id信息
 	matchIdx       []int
@@ -84,7 +84,7 @@ type Raft struct {
 	electionTimeout uint64
 }
 
-func BuildRaft(peers []*RaftClientEnd, me int, dbEngine engine.KvStore, applyCh chan *protocol.ApplyMsg, heartbeatTimeout uint64, electionTimeout uint64) *Raft {
+func BuildRaft(peers []*RaftClientEnd, me int, dbEngine engine.KvStore, applyCh chan *pb.ApplyMsg, heartbeatTimeout uint64, electionTimeout uint64) *Raft {
 	raft := &Raft{
 		peers:            peers,
 		me:               me,

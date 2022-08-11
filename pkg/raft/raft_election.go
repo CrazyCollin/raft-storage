@@ -3,13 +3,12 @@ package raft
 import (
 	"context"
 	"rstorage/pkg/log"
-	"rstorage/pkg/protocol"
+	pb "rstorage/pkg/protocol"
 )
 
 //
 // StartElection
 // @Description: 当前节点发起选举
-// @receiver r
 //
 func (r *Raft) StartElection() {
 	//todo 开始新一轮选举
@@ -17,7 +16,7 @@ func (r *Raft) StartElection() {
 	r.grantedVotes = 1
 	r.voteFor = int64(r.me)
 	//构造选举请求
-	requestVoteReq := &protocol.RequestVoteReq{
+	requestVoteReq := &pb.RequestVoteReq{
 		Term:         r.currTerm,
 		CandidateId:  int64(r.me),
 		LastLogIndex: r.logs.GetLastEntry().Index,
@@ -36,7 +35,7 @@ func (r *Raft) StartElection() {
 
 			requestVoteResp, err := (*peer.raftServiceCli).RequestVote(context.Background(), requestVoteReq)
 			if err != nil {
-				log.Log.Errorf("node-%d-start send vote request failed to peer-%d-", r.me, peer.id)
+				log.Log.Errorf("node-%d-send vote request failed to peer-%d-", r.me, peer.id)
 			}
 
 			//获取选举请求回复
@@ -74,17 +73,14 @@ func (r *Raft) StartElection() {
 //
 // HandleRequestVote
 // @Description: 处理选举请求etcd
-// @receiver r
-// @param request
-// @param resp
 //
-func (r *Raft) HandleRequestVote(request *protocol.RequestVoteReq, resp *protocol.RequestVoteResp) {
+func (r *Raft) HandleRequestVote(request *pb.RequestVoteReq, resp *pb.RequestVoteResp) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	log.Log.Debugf("node-%d-start to handle a vote request from peer", r.me)
 
 	//查看和当前节点的log相比，进行选举的log是否更新
-	expired := r.CheckDataExpired(request.LastLogIndex, request.LastLogTerm)
+	expired := r.CheckReqDataExpired(request.LastLogIndex, request.LastLogTerm)
 	//满足之前投的票就是当前请求的节点，或者是没有给其他节点投过票，或者请求消息的term比当前节点的任期要大
 	canVote := r.voteFor == request.CandidateId || (r.voteFor == None && r.leaderId == None) || request.Term > r.currTerm
 
@@ -100,15 +96,10 @@ func (r *Raft) HandleRequestVote(request *protocol.RequestVoteReq, resp *protoco
 	//todo 重置选举计时器
 }
 
-//
-// CheckDataExpired
+// CheckReqDataExpired
 // @Description: 检查当前节点日志状态是否过期，已过期则返回true，总要保证选举节点是最新状态
-// @receiver r
-// @param lastIdx
-// @param term
-// @return bool
 //
-func (r *Raft) CheckDataExpired(lastIdx, term int64) bool {
+func (r *Raft) CheckReqDataExpired(lastIdx, term int64) bool {
 	lastEntry := r.logs.GetLastEntry()
 	var dataIsExpired bool
 	//请求的任期较大

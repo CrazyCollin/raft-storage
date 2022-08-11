@@ -4,7 +4,7 @@ import (
 	"rstorage/pkg/common"
 	"rstorage/pkg/engine"
 	"rstorage/pkg/log"
-	"rstorage/pkg/protocol"
+	pb "rstorage/pkg/protocol"
 )
 
 type StateOfRaftLog struct {
@@ -19,7 +19,7 @@ type StateOfRaftLog struct {
 // @return *RaftLog
 //
 func BuildPersistentRaftLog(dbEngine engine.KvStore) *RaftLog {
-	entry := &protocol.Entry{}
+	entry := &pb.Entry{}
 	encodedEntry := EncodeEntry(entry)
 	dbEngine.Put(EncodeRaftLogKey(common.INIT_LOG_INDEX), encodedEntry)
 	return &RaftLog{db: dbEngine}
@@ -31,7 +31,7 @@ func BuildPersistentRaftLog(dbEngine engine.KvStore) *RaftLog {
 // @receiver l
 // @param entry
 //
-func (l *RaftLog) AppendEntry(entry *protocol.Entry) {
+func (l *RaftLog) AppendEntry(entry *pb.Entry) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	lastLogID, err := l.db.SeekPrefixKeyIdMax(common.RAFTLOG_PREFIX)
@@ -48,7 +48,7 @@ func (l *RaftLog) AppendEntry(entry *protocol.Entry) {
 // @receiver l
 // @return *protocol.Entry
 //
-func (l *RaftLog) GetFirstEntry() *protocol.Entry {
+func (l *RaftLog) GetFirstEntry() *pb.Entry {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 	logKey, logValue, err := l.db.SeekPrefixFirst(common.RAFTLOG_PREFIX)
@@ -61,7 +61,7 @@ func (l *RaftLog) GetFirstEntry() *protocol.Entry {
 	return firstEntry
 }
 
-func (l *RaftLog) GetLastEntry() *protocol.Entry {
+func (l *RaftLog) GetLastEntry() *pb.Entry {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 	logKey, logValue, err := l.db.SeekPrefixLast(common.RAFTLOG_PREFIX)
@@ -74,9 +74,12 @@ func (l *RaftLog) GetLastEntry() *protocol.Entry {
 	return lastEntry
 }
 
-func (l *RaftLog) GetEntry(index int) *protocol.Entry {
-	firstLogID := l.GetFirstLogID()
-	encodedEntry, err := l.db.Get(EncodeRaftLogKey(firstLogID + uint64(index)))
+//
+// GetEntry
+// @Description: 获取指定entry
+//
+func (l *RaftLog) getEntry(index int64) *pb.Entry {
+	encodedEntry, err := l.db.Get(EncodeRaftLogKey(uint64(index)))
 	if err != nil {
 		log.Log.Debugf("get specific entry error:%v", err)
 		panic(err)
@@ -85,12 +88,18 @@ func (l *RaftLog) GetEntry(index int) *protocol.Entry {
 	return entry
 }
 
-func (l *RaftLog) GetRangeEntries(firstIdx, lastIdx int) []*protocol.Entry {
+func (l *RaftLog) GetEntry(index int64) *pb.Entry {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
-	entries := make([]*protocol.Entry, lastIdx-firstIdx+1)
+	return l.getEntry(index)
+}
+
+func (l *RaftLog) GetRangeEntries(firstIdx, lastIdx int64) []*pb.Entry {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	entries := make([]*pb.Entry, lastIdx-firstIdx+1)
 	for i := firstIdx; i < lastIdx; i++ {
-		entries[i] = l.GetEntry(i)
+		entries[i] = l.getEntry(i)
 	}
 	return entries
 }
@@ -111,18 +120,32 @@ func (l *RaftLog) PersistStateOfRaftLog(currTerm, votedFor int64) {
 }
 
 func (l *RaftLog) GetFirstLogID() uint64 {
-	logKey, _, err := l.db.SeekPrefixFirst(common.RAFTLOG_PREFIX)
-	if err != nil {
-		panic(err)
-	}
-	firstLogID := DecodeRaftLogKey(logKey)
-	return firstLogID
+	//logKey, _, err := l.db.SeekPrefixFirst(common.RAFTLOG_PREFIX)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//firstLogID := DecodeRaftLogKey(logKey)
+	//return firstLogID
+	return l.firstIdx
 }
 
 func (l *RaftLog) GetLastLogID() uint64 {
-	lastLogID, err := l.db.SeekPrefixKeyIdMax(common.RAFTLOG_PREFIX)
-	if err != nil {
-		panic(err)
+	//lastLogID, err := l.db.SeekPrefixKeyIdMax(common.RAFTLOG_PREFIX)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//return lastLogID
+	return l.lastIdx
+}
+
+func (l *RaftLog) EraseBefore(idx int64) []*pb.Entry {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	var entries []*pb.Entry
+	lastLogId := l.GetLastLogID()
+	log.Log.Debugf("get log [%d:%d] ", idx, lastLogId)
+	for i := idx; i <= int64(lastLogId); i++ {
+		entries = append(entries, l.GetEntry(i))
 	}
-	return lastLogID
+	return entries
 }

@@ -44,11 +44,6 @@ func (k *KvStoreLevelDB) Del(key []byte) error {
 //
 // GetPrefixRangeKvs
 // @Description: 按前缀范围查询
-// @receiver k
-// @param prefix
-// @return []string
-// @return []string
-// @return error
 //
 func (k *KvStoreLevelDB) GetPrefixRangeKvs(prefix []byte) ([]string, []string, error) {
 	keys := make([]string, 0)
@@ -66,11 +61,6 @@ func (k *KvStoreLevelDB) GetPrefixRangeKvs(prefix []byte) ([]string, []string, e
 //
 // SeekPrefixFirst
 // @Description: 查找符合第一个前缀的kv对
-// @receiver k
-// @param prefix
-// @return []byte
-// @return []byte
-// @return error
 //
 func (k *KvStoreLevelDB) SeekPrefixFirst(prefix []byte) ([]byte, []byte, error) {
 	iter := k.db.NewIterator(util.BytesPrefix(prefix), nil)
@@ -84,11 +74,6 @@ func (k *KvStoreLevelDB) SeekPrefixFirst(prefix []byte) ([]byte, []byte, error) 
 //
 // SeekPrefixLast
 // @Description: 查询最后一个符合前缀的kv对
-// @receiver k
-// @param prefix
-// @return []byte
-// @return []byte
-// @return error
 //
 func (k *KvStoreLevelDB) SeekPrefixLast(prefix []byte) ([]byte, []byte, error) {
 	iter := k.db.NewIterator(util.BytesPrefix(prefix), nil)
@@ -105,9 +90,6 @@ func (k *KvStoreLevelDB) SeekPrefixLast(prefix []byte) ([]byte, []byte, error) {
 //
 // DelPrefixKeys
 // @Description: 删除含前缀的kv对
-// @receiver k
-// @param prefix
-// @return error
 //
 func (k *KvStoreLevelDB) DelPrefixKeys(prefix []byte) error {
 	iter := k.db.NewIterator(util.BytesPrefix(prefix), nil)
@@ -124,10 +106,6 @@ func (k *KvStoreLevelDB) DelPrefixKeys(prefix []byte) error {
 //
 // SeekPrefixKeyIdMax
 // @Description: 返回满足前缀的最大的id
-// @receiver k
-// @param prefix
-// @return uint64
-// @return error
 //
 func (k *KvStoreLevelDB) SeekPrefixKeyIdMax(prefix []byte) (uint64, error) {
 	iter := k.db.NewIterator(util.BytesPrefix([]byte(prefix)), nil)
@@ -147,10 +125,6 @@ func (k *KvStoreLevelDB) SeekPrefixKeyIdMax(prefix []byte) (uint64, error) {
 //
 // DumpPrefixKey
 // @Description: 保存满足前缀的kv map
-// @receiver k
-// @param prefix
-// @return map[string]string
-// @return error
 //
 func (k *KvStoreLevelDB) DumpPrefixKey(prefix string) (map[string]string, error) {
 	kvs := make(map[string]string)
