@@ -113,12 +113,18 @@ func (r *Raft) replicateOneRound(peer *RaftClientEnd) {
 				//追加成功，匹配完全
 				r.matchIdx[peer.Id()] = int(appendEntriesReq.PrevLogIndex) + len(appendEntriesReq.Entries)
 				r.nextIdx[peer.Id()] = r.matchIdx[peer.Id()] + 1
-				//todo 处理复制进度，准备提交
+				r.ManageLeaderCommitIndex()
 			} else {
 				if appendEntriesResp.Term > appendEntriesReq.Term {
-					//todo 已经有更高任期leader，转换角色
+					r.SwitchRole(FOLLOWER)
+					r.currTerm = appendEntriesResp.GetTerm()
+					r.voteFor = None
+					r.PersistState()
 				} else {
 					//todo 日志冲突，待追加同步
+					//重置冲突peer的nextIndex
+					r.nextIdx[peer.Id()] = int(appendEntriesResp.ConflictIndex)
+
 				}
 			}
 		}
@@ -147,4 +153,56 @@ func (r *Raft) InitAppendEntriesReq(prevLogIndex uint64) *pb.AppendEntriesReq {
 
 func (r *Raft) HandleAppendEntries(req *pb.AppendEntriesReq, resp *pb.AppendEntriesResp) {
 	//todo 处理append请求&处理心跳
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	//req term较小
+	if req.GetTerm() < r.currTerm {
+		resp.Term = r.currTerm
+		resp.Success = false
+		return
+	}
+	//req term较大
+	if req.GetTerm() > r.currTerm {
+		r.currTerm = req.GetTerm()
+		r.voteFor = None
+	}
+
+	r.SwitchRole(FOLLOWER)
+	//todo 接收到（心跳）消息，重置选举计时器
+	r.electionTimer.Reset(0)
+	r.leaderId = req.LeaderId
+
+	//leader log
+	if req.PrevLogIndex < int64(r.logs.firstIdx) {
+		resp.Term = 0
+		resp.Success = false
+		log.Log.Debugf("node-%d-received wrong log index which req's prev log index is small than current first log index", r.me)
+		return
+	}
+	if !r.MatchLog(req.PrevLogIndex, req.PrevLogTerm) {
+		//todo 处理log mismatch
+		return
+	}
+	//todo log match的情况
+}
+
+//
+// ManageLeaderCommitIndex
+// @Description: 根据复制进度处理提交
+//
+func (r *Raft) ManageLeaderCommitIndex() {
+	//todo 处理复制进度，准备提交
+}
+
+//
+// ManageFollowerCommitIndex
+// @Description: 处理follower的commit
+//
+func (r *Raft) ManageFollowerCommitIndex() {
+	//todo 处理follower提交
+}
+
+func (r *Raft) MatchLog(index, term int64) bool {
+	return index >= int64(r.logs.firstIdx) && index <= int64(r.logs.lastIdx) && uint64(term) == r.logs.GetEntry(index).GetTerm()
 }
