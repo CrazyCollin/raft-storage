@@ -114,7 +114,6 @@ func BuildRaft(peers []*RaftClientEnd, me int, dbEngine engine.KvStore, applyCh 
 //
 // Ticker
 // @Description: 处理选举超时和心跳超时
-// @receiver r
 //
 func (r *Raft) Ticker() {
 	for !r.IsDead() {
@@ -144,8 +143,6 @@ func (r *Raft) IsDead() bool {
 
 // SwitchRole
 // @Description: 改变当前节点角色
-// @receiver r
-// @param role
 //
 func (r *Raft) SwitchRole(role ROLE) {
 	if r.role == role {
@@ -169,4 +166,11 @@ func (r *Raft) IncrGrantedVotes() {
 
 func (r *Raft) PersistState() {
 	r.persister.PersistStateOfRaftLog(r.currTerm, r.voteFor)
+}
+
+func Min(a, b int) int {
+	if a <= b {
+		return a
+	}
+	return b
 }

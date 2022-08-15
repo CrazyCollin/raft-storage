@@ -4,6 +4,7 @@ import (
 	"context"
 	"rstorage/pkg/log"
 	pb "rstorage/pkg/protocol"
+	"sort"
 )
 
 //
@@ -96,6 +97,7 @@ func (r *Raft) replicateOneRound(peer *RaftClientEnd) {
 	if prevLogIndex < r.logs.GetFirstLogID() {
 		//todo 发送快照
 	} else {
+		firstIndex := r.logs.firstIdx
 		//构造请求
 		log.Log.Debugf("leader-%d-start send append entries", r.me)
 		appendEntriesReq := r.InitAppendEntriesReq(prevLogIndex)
@@ -121,10 +123,18 @@ func (r *Raft) replicateOneRound(peer *RaftClientEnd) {
 					r.voteFor = None
 					r.PersistState()
 				} else {
-					//todo 日志冲突，待追加同步
 					//重置冲突peer的nextIndex
 					r.nextIdx[peer.Id()] = int(appendEntriesResp.ConflictIndex)
-
+					if appendEntriesResp.ConflictTerm != -1 {
+						//从后往前找第一个不冲突的
+						for i := appendEntriesReq.PrevLogIndex; i >= int64(firstIndex); i-- {
+							//找到不冲突任期
+							if r.logs.getEntry(i).GetTerm() == uint64(appendEntriesResp.GetConflictTerm()) {
+								r.nextIdx[peer.id] = int(i + 1)
+								break
+							}
+						}
+					}
 				}
 			}
 		}
@@ -155,6 +165,7 @@ func (r *Raft) HandleAppendEntries(req *pb.AppendEntriesReq, resp *pb.AppendEntr
 	//todo 处理append请求&处理心跳
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	//todo 持久化
 
 	//req term较小
 	if req.GetTerm() < r.currTerm {
@@ -182,9 +193,37 @@ func (r *Raft) HandleAppendEntries(req *pb.AppendEntriesReq, resp *pb.AppendEntr
 	}
 	if !r.MatchLog(req.PrevLogIndex, req.PrevLogTerm) {
 		//todo 处理log mismatch
+		resp.Term, resp.Success = r.currTerm, false
+		lastIndex := int64(r.logs.lastIdx)
+		if lastIndex < req.PrevLogIndex+1 {
+			//log term冲突
+			log.Log.Debugf("confict log in index-%d-term-%d-")
+			resp.ConflictIndex, resp.ConflictTerm = int64(lastIndex+1), -1
+		} else {
+			//log index冲突
+			firstIndex := r.logs.firstIdx
+			resp.ConflictTerm = int64(r.logs.GetEntry(req.PrevLogIndex).GetTerm())
+			index := req.PrevLogIndex
+			for index >= int64(firstIndex) && r.logs.getEntry(index).GetTerm() == uint64(resp.ConflictTerm) {
+				index--
+			}
+			resp.ConflictIndex = index
+		}
 		return
 	}
-	//todo log match的情况
+	firstIndex := r.logs.firstIdx
+	for index, entry := range req.Entries {
+		//todo
+		if entry.GetIndex()-int64(firstIndex) >= int64(r.logs.LogCounts()) || r.logs.GetEntry(entry.Index).GetTerm() != entry.Term {
+			//todo log范围删除处理
+			for _, newEntry := range req.Entries[index:] {
+				r.logs.AppendEntry(newEntry)
+			}
+			break
+		}
+	}
+	r.ManageFollowerCommitIndex(req.LeaderCommit)
+	resp.Term, resp.Success = r.currTerm, true
 }
 
 //
@@ -192,15 +231,31 @@ func (r *Raft) HandleAppendEntries(req *pb.AppendEntriesReq, resp *pb.AppendEntr
 // @Description: 根据复制进度处理提交
 //
 func (r *Raft) ManageLeaderCommitIndex() {
-	//todo 处理复制进度，准备提交
+	matchIdx := r.matchIdx
+	sort.Ints(matchIdx)
+	num := len(matchIdx)
+	commitIdx := matchIdx[num/2]
+	if int64(commitIdx) > r.commitIdx {
+		if r.MatchLog(r.currTerm, int64(commitIdx)) {
+			log.Log.Debugf("leader-%d-advance commit index %d at term %d", r.me, r.commitIdx, r.currTerm)
+			r.commitIdx = int64(commitIdx)
+			r.applyCond.Signal()
+		}
+	}
+
 }
 
 //
 // ManageFollowerCommitIndex
 // @Description: 处理follower的commit
 //
-func (r *Raft) ManageFollowerCommitIndex() {
-	//todo 处理follower提交
+func (r *Raft) ManageFollowerCommitIndex(leaderCommit int64) {
+	commitIdx := Min(int(leaderCommit), int(r.logs.lastIdx))
+	if commitIdx > int(r.commitIdx) {
+		log.Log.Debugf("peer-%d-advance commit index %d at term %d", r.me, r.commitIdx, r.currTerm)
+		r.commitIdx = int64(commitIdx)
+		r.applyCond.Signal()
+	}
 }
 
 func (r *Raft) MatchLog(index, term int64) bool {

@@ -43,9 +43,6 @@ func (l *RaftLog) GetMemEntry(index int) *pb.Entry {
 
 // GetMemBeforeIdx
 // @Description: è·å–indexåŠä¹‹å‰çš„entry
-// @receiver l
-// @param index
-// @return []*protocol.Entry
 //
 func (l *RaftLog) GetMemBeforeIdx(index int) []*pb.Entry {
 	return l.items[:index+1]
@@ -61,9 +58,6 @@ func (l *RaftLog) GetMemRangeEntries(first, last int) []*pb.Entry {
 
 // DelMemBeforeIdx
 // @Description: å°†indexåŠä¹‹å‰çš„entryåˆ æ‰
-// @receiver l
-// @param index
-// @return []*protocol.Entry
 //
 func (l *RaftLog) DelMemBeforeIdx(index int) []*pb.Entry {
 	l.items = l.items[:index+1]
@@ -73,4 +67,9 @@ func (l *RaftLog) DelMemBeforeIdx(index int) []*pb.Entry {
 func (l *RaftLog) DelMemAfterIdx(index int) []*pb.Entry {
 	l.items = l.items[index:]
 	return l.items
+}
+
+func (l *RaftLog) LogCounts() int {
+	//todo ¼ÆËãlogÊıÁ¿
+	return 0
 }
