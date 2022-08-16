@@ -11,8 +11,6 @@ import (
 //
 // EncodeRaftLogKey
 // @Description: 序列化raft log的key
-// @param index
-// @return []byte
 //
 func EncodeRaftLogKey(index uint64) []byte {
 	var byteBuffer bytes.Buffer
@@ -26,8 +24,6 @@ func EncodeRaftLogKey(index uint64) []byte {
 //
 // DecodeRaftLogKey
 // @Description: 反序列化raft log的key
-// @param dataBytes
-// @return uint64
 //
 func DecodeRaftLogKey(dataBytes []byte) uint64 {
 	//从第五个字节开始返回
@@ -37,8 +33,6 @@ func DecodeRaftLogKey(dataBytes []byte) uint64 {
 //
 // EncodeEntry
 // @Description: 序列化日志条目
-// @param entry
-// @return []byte
 //
 func EncodeEntry(entry *pb.Entry) []byte {
 	var byteBuffer bytes.Buffer
@@ -50,8 +44,6 @@ func EncodeEntry(entry *pb.Entry) []byte {
 //
 // DecodeEntry
 // @Description: 反序列化日志条目
-// @param dataBytes
-// @return *protocol.Entry
 //
 func DecodeEntry(dataBytes []byte) *pb.Entry {
 	decoder := gob.NewDecoder(bytes.NewBuffer(dataBytes))

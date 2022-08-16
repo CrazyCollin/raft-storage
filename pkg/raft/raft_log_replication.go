@@ -85,7 +85,6 @@ func (r *Raft) Replicator(peer *RaftClientEnd) {
 // @Description: 从leader复制log至follower，用于心跳检测和log replication
 //
 func (r *Raft) replicateOneRound(peer *RaftClientEnd) {
-	//todo 复制
 	r.mu.RLock()
 	//角色不是leader，返回
 	if r.role != LEADER {
@@ -117,6 +116,7 @@ func (r *Raft) replicateOneRound(peer *RaftClientEnd) {
 				r.nextIdx[peer.Id()] = r.matchIdx[peer.Id()] + 1
 				r.ManageLeaderCommitIndex()
 			} else {
+				//追加失败
 				if appendEntriesResp.Term > appendEntriesReq.Term {
 					r.SwitchRole(FOLLOWER)
 					r.currTerm = appendEntriesResp.GetTerm()
@@ -140,25 +140,6 @@ func (r *Raft) replicateOneRound(peer *RaftClientEnd) {
 		}
 
 	}
-}
-
-//
-// InitAppendEntriesReq
-// @Description: 构造append entries请求
-//
-func (r *Raft) InitAppendEntriesReq(prevLogIndex uint64) *pb.AppendEntriesReq {
-	//获取entries
-	entries := make([]*pb.Entry, r.logs.GetLastLogID()-prevLogIndex)
-	copy(entries, r.logs.EraseBefore(int64(prevLogIndex+1)))
-	appendEntriesReq := &pb.AppendEntriesReq{
-		Term:         r.currTerm,
-		LeaderId:     int64(r.me),
-		PrevLogIndex: int64(prevLogIndex),
-		PrevLogTerm:  int64(r.logs.GetEntry(int64(prevLogIndex)).GetTerm()),
-		LeaderCommit: r.commitIdx,
-		Entries:      entries,
-	}
-	return appendEntriesReq
 }
 
 func (r *Raft) HandleAppendEntries(req *pb.AppendEntriesReq, resp *pb.AppendEntriesResp) {
@@ -191,13 +172,13 @@ func (r *Raft) HandleAppendEntries(req *pb.AppendEntriesReq, resp *pb.AppendEntr
 		log.Log.Debugf("node-%d-received wrong log index which req's prev log index is small than current first log index", r.me)
 		return
 	}
+	//log mismatch
 	if !r.MatchLog(req.PrevLogIndex, req.PrevLogTerm) {
-		//todo 处理log mismatch
 		resp.Term, resp.Success = r.currTerm, false
 		lastIndex := int64(r.logs.lastIdx)
 		if lastIndex < req.PrevLogIndex+1 {
-			//log term冲突
-			log.Log.Debugf("confict log in index-%d-term-%d-")
+			//log index冲突，设置conflict index
+			log.Log.Debugf("confict log in index-%d-term-%d-", lastIndex+1, -1)
 			resp.ConflictIndex, resp.ConflictTerm = int64(lastIndex+1), -1
 		} else {
 			//log index冲突
@@ -211,11 +192,11 @@ func (r *Raft) HandleAppendEntries(req *pb.AppendEntriesReq, resp *pb.AppendEntr
 		}
 		return
 	}
+	//log match
 	firstIndex := r.logs.firstIdx
 	for index, entry := range req.Entries {
-		//todo
 		if entry.GetIndex()-int64(firstIndex) >= int64(r.logs.LogCounts()) || r.logs.GetEntry(entry.Index).GetTerm() != entry.Term {
-			//todo log范围删除处理
+			r.logs.EraseAfter(entry.GetIndex(), true)
 			for _, newEntry := range req.Entries[index:] {
 				r.logs.AppendEntry(newEntry)
 			}
@@ -260,4 +241,23 @@ func (r *Raft) ManageFollowerCommitIndex(leaderCommit int64) {
 
 func (r *Raft) MatchLog(index, term int64) bool {
 	return index >= int64(r.logs.firstIdx) && index <= int64(r.logs.lastIdx) && uint64(term) == r.logs.GetEntry(index).GetTerm()
+}
+
+//
+// InitAppendEntriesReq
+// @Description: 构造append entries请求
+//
+func (r *Raft) InitAppendEntriesReq(prevLogIndex uint64) *pb.AppendEntriesReq {
+	//获取entries
+	entries := make([]*pb.Entry, r.logs.GetLastLogID()-prevLogIndex)
+	copy(entries, r.logs.EraseAfterIdx(int64(prevLogIndex+1)))
+	appendEntriesReq := &pb.AppendEntriesReq{
+		Term:         r.currTerm,
+		LeaderId:     int64(r.me),
+		PrevLogIndex: int64(prevLogIndex),
+		PrevLogTerm:  int64(r.logs.GetEntry(int64(prevLogIndex)).GetTerm()),
+		LeaderCommit: r.commitIdx,
+		Entries:      entries,
+	}
+	return appendEntriesReq
 }

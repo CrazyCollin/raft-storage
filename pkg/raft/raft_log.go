@@ -70,6 +70,7 @@ func (l *RaftLog) DelMemAfterIdx(index int) []*pb.Entry {
 }
 
 func (l *RaftLog) LogCounts() int {
-	//todo º∆À„log ˝¡ø
-	return 0
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return int(l.lastIdx - l.firstIdx + 1)
 }

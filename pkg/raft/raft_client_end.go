@@ -39,6 +39,6 @@ func (rce *RaftClientEnd) GetRaftServiceCli() *pb.RaftServiceClient {
 
 func (rce *RaftClientEnd) CloseConn() {
 	for _, conn := range rce.conns {
-		conn.Close()
+		_ = conn.Close()
 	}
 }

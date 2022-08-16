@@ -168,9 +168,8 @@ func (r *Raft) PersistState() {
 	r.persister.PersistStateOfRaftLog(r.currTerm, r.voteFor)
 }
 
-func Min(a, b int) int {
-	if a <= b {
-		return a
-	}
-	return b
+func (r *Raft) GetLogCounts() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.logs.LogCounts()
 }

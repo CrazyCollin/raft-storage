@@ -15,8 +15,6 @@ type StateOfRaftLog struct {
 //
 // BuildPersistentRaftLog
 // @Description: 初始化持久性raft log
-// @param dbEngine
-// @return *RaftLog
 //
 func BuildPersistentRaftLog(dbEngine engine.KvStore) *RaftLog {
 	entry := &pb.Entry{}
@@ -28,8 +26,6 @@ func BuildPersistentRaftLog(dbEngine engine.KvStore) *RaftLog {
 //
 // AppendEntry
 // @Description: 添加日志条目
-// @receiver l
-// @param entry
 //
 func (l *RaftLog) AppendEntry(entry *pb.Entry) {
 	l.mu.Lock()
@@ -107,9 +103,6 @@ func (l *RaftLog) GetRangeEntries(firstIdx, lastIdx int64) []*pb.Entry {
 //
 // PersistStateOfRaftLog
 // @Description: 持久化当前raft状态
-// @receiver l
-// @param currTerm
-// @param votedFor
 //
 func (l *RaftLog) PersistStateOfRaftLog(currTerm, votedFor int64) {
 	state := &StateOfRaftLog{
@@ -138,7 +131,7 @@ func (l *RaftLog) GetLastLogID() uint64 {
 	return l.lastIdx
 }
 
-func (l *RaftLog) EraseBefore(idx int64) []*pb.Entry {
+func (l *RaftLog) EraseAfterIdx(idx int64) []*pb.Entry {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	var entries []*pb.Entry
@@ -146,6 +139,26 @@ func (l *RaftLog) EraseBefore(idx int64) []*pb.Entry {
 	log.Log.Debugf("get log [%d:%d] ", idx, lastLogId)
 	for i := idx; i <= int64(lastLogId); i++ {
 		entries = append(entries, l.GetEntry(i))
+	}
+	return entries
+}
+
+func (l *RaftLog) EraseAfter(idx int64, del bool) []*pb.Entry {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	firstLogId := l.GetFirstLogID()
+	log.Log.Debugf("start erase after log index:%d\n", idx)
+	if del {
+		for i := idx; i <= int64(l.GetLastLogID()); i++ {
+			if err := l.db.Del(EncodeRaftLogKey(uint64(i))); err != nil {
+				panic(err)
+			}
+		}
+		l.lastIdx = uint64(idx) - 1
+	}
+	var entries []*pb.Entry
+	for i := firstLogId; i < uint64(idx); i++ {
+		entries = append(entries, l.GetEntry(int64(i)))
 	}
 	return entries
 }
