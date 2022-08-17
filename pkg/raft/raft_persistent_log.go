@@ -24,6 +24,22 @@ func BuildPersistentRaftLog(dbEngine engine.KvStore) *RaftLog {
 }
 
 //
+// ReInitLogs
+// @Description: 初始化日志
+//
+func (l *RaftLog) ReInitLogs() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.db.DelPrefixKeys(common.RAFTLOG_PREFIX); err != nil {
+		return err
+	}
+	emptyEntry := &pb.Entry{}
+	emptyEntryEncodeBytes := EncodeEntry(emptyEntry)
+	l.firstIdx, l.lastIdx = 0, 0
+	return l.db.Put(EncodeRaftLogKey(common.INIT_LOG_INDEX), emptyEntryEncodeBytes)
+}
+
+//
 // AppendEntry
 // @Description: 添加日志条目
 //
@@ -41,8 +57,6 @@ func (l *RaftLog) AppendEntry(entry *pb.Entry) {
 //
 // GetFirstEntry
 // @Description: 获取日志中首个日志条目
-// @receiver l
-// @return *protocol.Entry
 //
 func (l *RaftLog) GetFirstEntry() *pb.Entry {
 	l.mu.RLock()
@@ -90,6 +104,10 @@ func (l *RaftLog) GetEntry(index int64) *pb.Entry {
 	return l.getEntry(index)
 }
 
+//
+// GetRangeEntries
+// @Description: [firstIdx,lastIdx)
+//
 func (l *RaftLog) GetRangeEntries(firstIdx, lastIdx int64) []*pb.Entry {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
@@ -112,22 +130,24 @@ func (l *RaftLog) PersistStateOfRaftLog(currTerm, votedFor int64) {
 	_ = l.db.Put(common.RAFT_STATE_KEY, EncodeRaftState(state))
 }
 
+//
+// ReadStateOfRaftLog
+// @Description: 读取当前raft持久化状态
+//
+func (l *RaftLog) ReadStateOfRaftLog() (int64, int64) {
+	stateBytes, err := l.db.Get(common.RAFT_STATE_KEY)
+	if err != nil {
+		return 0, -1
+	}
+	state := DecodeRaftState(stateBytes)
+	return state.currTerm, state.votedFor
+}
+
 func (l *RaftLog) GetFirstLogID() uint64 {
-	//logKey, _, err := l.db.SeekPrefixFirst(common.RAFTLOG_PREFIX)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//firstLogID := DecodeRaftLogKey(logKey)
-	//return firstLogID
 	return l.firstIdx
 }
 
 func (l *RaftLog) GetLastLogID() uint64 {
-	//lastLogID, err := l.db.SeekPrefixKeyIdMax(common.RAFTLOG_PREFIX)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//return lastLogID
 	return l.lastIdx
 }
 

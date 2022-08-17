@@ -40,7 +40,6 @@ func (r *Raft) StartElection() {
 
 			//获取选举请求回复
 			if requestVoteResp != nil {
-				//todo 处理选举请求回复
 				r.mu.Lock()
 				defer r.mu.Unlock()
 				log.Log.Debugf("node-%d-reveived vote response from peer-%d-", r.me, peer.id)
@@ -93,7 +92,7 @@ func (r *Raft) HandleRequestVote(request *pb.RequestVoteReq, resp *pb.RequestVot
 		return
 	}
 	r.voteFor = request.CandidateId
-	//todo 重置选举计时器
+	r.electionTimer.Reset(RandomElectionTimeout(r.electionTimeout))
 }
 
 // CheckReqDataExpired

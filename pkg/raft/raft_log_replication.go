@@ -143,7 +143,6 @@ func (r *Raft) replicateOneRound(peer *RaftClientEnd) {
 }
 
 func (r *Raft) HandleAppendEntries(req *pb.AppendEntriesReq, resp *pb.AppendEntriesResp) {
-	//todo 处理append请求&处理心跳
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	//todo 持久化
@@ -161,8 +160,7 @@ func (r *Raft) HandleAppendEntries(req *pb.AppendEntriesReq, resp *pb.AppendEntr
 	}
 
 	r.SwitchRole(FOLLOWER)
-	//todo 接收到（心跳）消息，重置选举计时器
-	r.electionTimer.Reset(0)
+	r.electionTimer.Reset(RandomElectionTimeout(r.electionTimeout))
 	r.leaderId = req.LeaderId
 
 	//leader log
