@@ -130,6 +130,10 @@ func (l *RaftLog) PersistStateOfRaftLog(currTerm, votedFor int64) {
 	_ = l.db.Put(common.RAFT_STATE_KEY, EncodeRaftState(state))
 }
 
+func (l *RaftLog) PersistSnapshot(snapshot []byte) {
+	l.db.Put(common.RAFT_SNAPSHOT_KEY, snapshot)
+}
+
 //
 // ReadStateOfRaftLog
 // @Description: 读取当前raft持久化状态
@@ -181,4 +185,65 @@ func (l *RaftLog) EraseAfter(idx int64, del bool) []*pb.Entry {
 		entries = append(entries, l.GetEntry(int64(i)))
 	}
 	return entries
+}
+
+//
+// EraseBefore
+// @Description: 删除指定索引之前的日志
+//
+func (l *RaftLog) EraseBefore(idx int64, del bool) ([]*pb.Entry, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if del {
+		firstLogId := l.GetFirstLogID()
+		for i := firstLogId; i < uint64(idx); i++ {
+			if err := l.db.Del(EncodeRaftLogKey(i)); err != nil {
+				log.Log.Debugf("erase error\n")
+				return nil, err
+			}
+			log.Log.Debugf("del log with index %d success", i)
+		}
+		l.firstIdx = uint64(idx)
+		log.Log.Debugf("after erase log,first log index:%d", l.firstIdx)
+		return nil, nil
+	}
+	var entries []*pb.Entry
+	lastLogId := l.GetLastLogID()
+	for i := idx; i <= int64(lastLogId); i++ {
+		entries = append(entries, l.GetEntry(i))
+	}
+	return entries, nil
+}
+
+func (l *RaftLog) SetEntryFirstIndexAndTerm(index, term int64) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	firstIdx := l.GetFirstLogID()
+
+	encodedBytes, err := l.db.Get(EncodeRaftLogKey(firstIdx))
+	if err != nil {
+		log.Log.Debugf("get first log error:%v\n", err)
+		return err
+	}
+
+	//删除首个entry
+	log.Log.Debugf("delete first log with index %d\n", firstIdx)
+	if err := l.db.Del(EncodeRaftLogKey(firstIdx)); err != nil {
+		log.Log.Debugf("delete first log error:%v\n", err)
+		return err
+	}
+	//更新首个entry的index和term
+	entry := DecodeEntry(encodedBytes)
+	entry.Index = index
+	entry.Term = uint64(term)
+	log.Log.Debugf("set first log index:%d,term:%d\n", index, term)
+
+	l.firstIdx = uint64(index)
+	l.lastIdx = uint64(index)
+	//重新写入首个entry
+	if err := l.db.Put(EncodeRaftLogKey(uint64(index)), EncodeEntry(entry)); err != nil {
+		log.Log.Debugf("set first log error:%v\n", err)
+		return err
+	}
+	return nil
 }
