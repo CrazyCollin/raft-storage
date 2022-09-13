@@ -153,6 +153,10 @@ func (r *Raft) Ticker() {
 	}
 }
 
+//
+// Applier
+// @Description: apply协程
+//
 func (r *Raft) Applier() {
 	for !r.IsDead() {
 		r.mu.Lock()
