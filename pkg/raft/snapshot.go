@@ -88,3 +88,11 @@ func (r *Raft) CondInstallSnapshot(lastIncludedTerm int, lastIncludedIndex int, 
 
 	return true
 }
+
+func (r *Raft) ReadSnapshot() []byte {
+	snapshot, err := r.logs.ReadSnapshot()
+	if err != nil {
+		log.Log.Debugf("read snapshot error:%v", err)
+	}
+	return snapshot
+}

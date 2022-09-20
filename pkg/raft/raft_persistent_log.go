@@ -134,6 +134,15 @@ func (l *RaftLog) PersistSnapshot(snapshot []byte) {
 	l.db.Put(common.RAFT_SNAPSHOT_KEY, snapshot)
 }
 
+func (l *RaftLog) ReadSnapshot() ([]byte, error) {
+	var snapshot []byte
+	var err error
+	if snapshot, err = l.db.Get(common.RAFT_SNAPSHOT_KEY); err != nil {
+		return nil, err
+	}
+	return snapshot, nil
+}
+
 //
 // ReadStateOfRaftLog
 // @Description: 读取当前raft持久化状态

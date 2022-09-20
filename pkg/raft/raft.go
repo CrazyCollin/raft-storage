@@ -241,3 +241,7 @@ func (r *Raft) ReInitLogs() {
 		return
 	}
 }
+
+func (r *Raft) GetLeaderID() int64 {
+	return r.leaderId
+}

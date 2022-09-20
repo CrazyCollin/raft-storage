@@ -15,7 +15,7 @@ func (r *Raft) Propose(payload []byte) (logIndex int, term int, isAccepted bool)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	//todo 待完善重定向至leader节点
-	if r.role != LEADER {
+	if r.role != LEADER || r.isSnapshotting {
 		return -1, -1, false
 	}
 	newEntry := r.AppendLogEntry(payload)
