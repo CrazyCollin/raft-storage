@@ -7,10 +7,10 @@ import (
 )
 
 type MetaServiceClientEnd struct {
-	id         uint64
-	addr       string
-	serviceCli *pb.MetaServiceClient
-	conns      []*grpc.ClientConn
+	id            uint64
+	addr          string
+	serviceClient *pb.MetaServiceClient
+	conns         []*grpc.ClientConn
 }
 
 func NewMetaServiceClientEnd(id uint64, addr string) *MetaServiceClientEnd {
@@ -22,11 +22,15 @@ func NewMetaServiceClientEnd(id uint64, addr string) *MetaServiceClientEnd {
 	conns = append(conns, conn)
 	rpcClient := pb.NewMetaServiceClient(conn)
 	return &MetaServiceClientEnd{
-		id:         id,
-		addr:       addr,
-		serviceCli: &rpcClient,
-		conns:      conns,
+		id:            id,
+		addr:          addr,
+		serviceClient: &rpcClient,
+		conns:         conns,
 	}
+}
+
+func (e MetaServiceClientEnd) GetMetaServiceClient() *pb.MetaServiceClient {
+	return e.serviceClient
 }
 
 func (e *MetaServiceClientEnd) CloseClientConns() {

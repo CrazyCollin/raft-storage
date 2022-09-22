@@ -1,6 +1,10 @@
 package metaserver
 
-import pb "rstorage/pkg/protocol"
+import (
+	"context"
+	"rstorage/pkg/log"
+	pb "rstorage/pkg/protocol"
+)
 
 //
 // MetaServiceCli
@@ -27,8 +31,29 @@ func NewMetaServiceCli(addresses []string) *MetaServiceCli {
 //
 func (cli *MetaServiceCli) GetServerGroupMeta(req *pb.ServerGroupMetaConfigRequest) (resp *pb.ServerGroupMetaConfigResponse) {
 	resp.ServerGroupMetas = &pb.ServerGroupMetas{}
-	for _, _ = range cli.endpoints {
-		//todo call endpoint
+	var err error
+	for _, endpoint := range cli.endpoints {
+		client := endpoint.GetMetaServiceClient()
+		resp, err = (*client).ServerGroupMeta(context.Background(), req)
+		if err != nil {
+			log.Log.Errorf("get server group meta from node address %s failed, err:%v\n", endpoint.addr, err)
+			continue
+		}
+		switch resp.ErrCode {
+		case pb.ErrCode_NO_ERR:
+			return resp
+		case pb.ErrCode_WRONG_LEADER_ERR:
+			//retry rpc call with leader
+			client := cli.endpoints[resp.LeaderId].GetMetaServiceClient()
+			resp, err = (*client).ServerGroupMeta(context.Background(), req)
+			if err != nil {
+				log.Log.Errorf("get server group meta from leader address %s failed, err:%v\n", endpoint.addr, err)
+			}
+			if resp.ErrCode == pb.ErrCode_RPC_CALL_TIMEOUT_ERR {
+				log.Log.Errorf("get server group meta from leader address %s timeout\n", endpoint.addr)
+			}
+			return resp
+		}
 	}
 	return resp
 }
