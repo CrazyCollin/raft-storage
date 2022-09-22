@@ -80,3 +80,45 @@ func DecodeBucket(data []byte) *pb.Bucket {
 	}
 	return &bucket
 }
+
+//
+// EncodeObjectKey
+// @Description: encode object key to bytes sequence = OBJECT_META_PREFIX + objectID
+//
+func EncodeObjectKey(objectID string) []byte {
+	var buffer bytes.Buffer
+	buffer.Write(common.OBJECT_META_PREFIX)
+	buffer.Write([]byte(objectID))
+	return buffer.Bytes()
+}
+
+//
+// DecodeObjectKey
+// @Description: decode bytes sequence to object key
+//
+func DecodeObjectKey(data []byte) string {
+	return string(data[len(common.OBJECT_META_PREFIX):])
+}
+
+func EncodeObject(object *pb.Object) []byte {
+	var buffer bytes.Buffer
+	encoder := gob.NewEncoder(&buffer)
+	err := encoder.Encode(object)
+	if err != nil {
+		log.Log.Debugf("encode object failed, err:%v\n", err)
+		return nil
+	}
+	return buffer.Bytes()
+}
+
+func DecodeObject(data []byte) *pb.Object {
+	var buffer bytes.Buffer
+	buffer.Write(data)
+	decoder := gob.NewDecoder(&buffer)
+	object := pb.Object{}
+	err := decoder.Decode(&object)
+	if err != nil {
+		log.Log.Debugf("decode object failed, err:%v\n", err)
+	}
+	return &object
+}
