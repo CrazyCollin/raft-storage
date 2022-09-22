@@ -6,9 +6,9 @@ import (
 )
 
 func TestDecodeBucketKey(t *testing.T) {
-	encodedData := EncodeBucketKey("01")
+	encodedData := EncodeBucketKey("111111")
 	decodedData := DecodeBucketKey(encodedData)
-	if decodedData != "01" {
+	if decodedData != "111111" {
 		t.Errorf("decode bucket key failed, decodedData:%v\n", decodedData)
 	} else {
 		t.Logf("decode bucket key success, decodedData:%v\n", decodedData)
@@ -16,9 +16,9 @@ func TestDecodeBucketKey(t *testing.T) {
 }
 
 func TestDecodeObjectKey(t *testing.T) {
-	encodedData := EncodeObjectKey("01")
+	encodedData := EncodeObjectKey("02")
 	decodedData := DecodeObjectKey(encodedData)
-	if decodedData != "01" {
+	if decodedData != "02" {
 		t.Errorf("decode object key failed, decodedData:%v\n", decodedData)
 	} else {
 		t.Logf("decode object key success, decodedData:%v\n", decodedData)
