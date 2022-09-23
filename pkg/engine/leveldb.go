@@ -43,19 +43,19 @@ func (k *KvStoreLevelDB) Del(key []byte) error {
 
 //
 // GetPrefixRangeKvs
-// @Description: 按前缀范围查询
+// @Description: search with prefix and return all kvs = (keys, values)
 //
 func (k *KvStoreLevelDB) GetPrefixRangeKvs(prefix []byte) ([]string, []string, error) {
 	keys := make([]string, 0)
-	vals := make([]string, 0)
+	values := make([]string, 0)
 	iter := k.db.NewIterator(util.BytesPrefix(prefix), nil)
 	for iter.Next() {
 		log.Log.Infof("iter key:%v,val:%v", iter.Key(), iter.Value())
 		keys = append(keys, string(iter.Key()))
-		vals = append(vals, string(iter.Value()))
+		values = append(values, string(iter.Value()))
 	}
 	iter.Release()
-	return keys, vals, nil
+	return keys, values, nil
 }
 
 //

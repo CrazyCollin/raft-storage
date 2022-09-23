@@ -6,10 +6,12 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"rstorage/pkg/common"
 	"rstorage/pkg/engine"
 	"rstorage/pkg/log"
 	pb "rstorage/pkg/protocol"
 	"rstorage/pkg/raft"
+	"strings"
 	"sync"
 	"time"
 )
@@ -90,7 +92,6 @@ func (s *MetaServer) RequestVote(ctx context.Context, request *pb.RequestVoteReq
 // @Description: 处理其他meta server的日志同步请求
 //
 func (s *MetaServer) AppendEntries(ctx context.Context, request *pb.AppendEntriesReq) (*pb.AppendEntriesResp, error) {
-	//todo append entries
 	resp := &pb.AppendEntriesResp{}
 	log.Log.Debugf("receive append entries:%v\n", request)
 	s.r.HandleAppendEntries(request, resp)
@@ -112,13 +113,13 @@ func (s *MetaServer) Snapshot(ctx context.Context, request *pb.InstallSnapshotRe
 
 //
 // ServerGroupMeta
-// @Description: 获取server group meta
+// @Description: 处理server group meta
 //
 func (s *MetaServer) ServerGroupMeta(ctx context.Context, req *pb.ServerGroupMetaConfigRequest) (*pb.ServerGroupMetaConfigResponse, error) {
 	log.Log.Debugf("receive server group meta request:%v\n", req)
 	resp := &pb.ServerGroupMetaConfigResponse{}
-	//todo encode request
-	lastLogIndex, _, isLeader := s.r.Propose(make([]byte, 0))
+	encodedRequestBytes := EncodeServerGroupMetaRequest(req)
+	lastLogIndex, _, isLeader := s.r.Propose(encodedRequestBytes)
 
 	//如果不是leader，直接返回
 	if !isLeader {
@@ -190,18 +191,142 @@ func (s *MetaServer) takeSnapshot(index int) {
 	s.r.Snapshot(index, byteBuffer.Bytes())
 }
 
+//
+// ApplyToSTM
+// @Description: apply协程，处理apply消息
+//
 func (s *MetaServer) ApplyToSTM(stopApplyCh <-chan interface{}) {
 	for {
+		//等待apply消息
 		select {
 		case <-stopApplyCh:
 			return
 		case applyMsg := <-s.applyCh:
 			if applyMsg.CommandValid {
-				//todo command apply to stm
-
+				req := DecodeServerGroupMetaRequest(applyMsg.Command)
 				resp := &pb.ServerGroupMetaConfigResponse{}
 
+				//处理server group meta请求
+				switch req.OpType {
+				case pb.ConfigServerGroupMetaOpType_OP_SERVER_GROUP_JOIN:
+					var serverGroups map[int][]string
+					for i, group := range req.ServerGroups {
+						serverGroups[int(i)] = strings.Split(group, ",")
+					}
+					err := s.stm.Join(serverGroups)
+					if err != nil {
+						resp.ErrCode = pb.ErrCode_APPLY_JOIN_TODO_TO_STM_ERR
+					}
+				case pb.ConfigServerGroupMetaOpType_OP_SERVER_GROUP_QUERY:
+					versionID := req.ConfigVersion
+					metaConfig, err := s.stm.Query(int(versionID))
+					if err != nil {
+						resp.ErrCode = pb.ErrCode_APPLY_QUERY_TOPO_CONF_ERR
+					}
+
+					resp.ServerGroupMetas = &pb.ServerGroupMetas{
+						ConfigVersion: int64(metaConfig.Version),
+						ServerGroups:  make(map[int64]string),
+					}
+					//add server group
+					for i, group := range metaConfig.ServerGroups {
+						resp.ServerGroupMetas.ServerGroups[int64(i)] = strings.Join(group, ",")
+					}
+					//add server slot
+					for _, slot := range metaConfig.Slots {
+						resp.ServerGroupMetas.Slots = append(resp.ServerGroupMetas.Slots, int64(slot))
+					}
+				case pb.ConfigServerGroupMetaOpType_OP_SERVER_GROUP_LEAVE:
+					var groupIDs []int
+					for _, gid := range req.Gids {
+						groupIDs = append(groupIDs, int(gid))
+					}
+					err := s.stm.Leave(groupIDs)
+					if err != nil {
+						resp.ErrCode = pb.ErrCode_APPLY_LEAVE_TODO_TO_STM_ERR
+					}
+				case pb.ConfigServerGroupMetaOpType_OP_OSS_BUCKET_ADD:
+					bucketID := common.GenUUID()
+					bucket := &pb.Bucket{
+						BucketId:   bucketID,
+						BucketName: req.BucketOpReq.BucketName,
+					}
+					encodedBucketKeyBytes := EncodeBucketKey(bucketID)
+					encodedBucketValueBytes := EncodeBucket(bucket)
+					err := s.db.Put(encodedBucketKeyBytes, encodedBucketValueBytes)
+					if err != nil {
+						resp.ErrCode = pb.ErrCode_PUT_BUCKET_TO_ENG_ERR
+					}
+					resp.ErrCode = pb.ErrCode_NO_ERR
+				case pb.ConfigServerGroupMetaOpType_OP_OSS_BUCKET_DEL:
+					bucketIDKey := req.BucketOpReq.BucketId
+					encodedBucketKeyBytes := EncodeBucketKey(bucketIDKey)
+					err := s.db.Del(encodedBucketKeyBytes)
+					if err != nil {
+						resp.ErrCode = pb.ErrCode_DEL_BUCKET_FROM_ENG_ERR
+					}
+					resp.ErrCode = pb.ErrCode_NO_ERR
+				case pb.ConfigServerGroupMetaOpType_OP_OSS_BUCKET_LIST:
+					var bucketList []*pb.Bucket
+					_, bucketData, err := s.db.GetPrefixRangeKvs(common.BUCKET_META_PREFIX)
+					if err != nil {
+						log.Log.Errorf("get bucket list from db error:%v\n", err)
+						return
+					}
+					resp.BucketOpRes = &pb.BucketOpResponse{}
+					log.Log.Debugf("start to decode bucket data:%v\n", bucketData)
+					for _, bucket := range bucketData {
+						bucketList = append(bucketList, DecodeBucket([]byte(bucket)))
+					}
+					resp.BucketOpRes.Buckets = bucketList
+					resp.ErrCode = pb.ErrCode_NO_ERR
+				case pb.ConfigServerGroupMetaOpType_OP_OSS_OBJECT_GET:
+					//todo
+
+				case pb.ConfigServerGroupMetaOpType_OP_OSS_OBJECT_PUT:
+					objectID := common.GenUUID()
+					object := &pb.Object{
+						ObjectId:         objectID,
+						ObjectName:       req.BucketOpReq.BucketName,
+						FromBucketId:     req.BucketOpReq.BucketId,
+						ObjectBlocksMeta: req.BucketOpReq.Object.ObjectBlocksMeta,
+					}
+					encodedObjectKeyBytes := EncodeObjectKey(objectID)
+					encodedObjectValueBytes := EncodeObject(object)
+					err := s.db.Put(encodedObjectKeyBytes, encodedObjectValueBytes)
+					if err != nil {
+						resp.ErrCode = pb.ErrCode_PUT_OBJECT_META_TO_ENG_ERR
+					}
+					resp.ErrCode = pb.ErrCode_NO_ERR
+				case pb.ConfigServerGroupMetaOpType_OP_OSS_OBJECT_LIST:
+					var objectList []*pb.Object
+					_, objectData, err := s.db.GetPrefixRangeKvs(common.OBJECT_META_PREFIX)
+					if err != nil {
+						log.Log.Errorf("get object list from db error:%v\n", err)
+						return
+					}
+					resp.BucketOpRes = &pb.BucketOpResponse{}
+					log.Log.Debugf("start to decode object data:%v\n", objectData)
+					for _, object := range objectData {
+						decodedObject := DecodeObject([]byte(object))
+						if decodedObject.FromBucketId == req.BucketOpReq.BucketId {
+							objectList = append(objectList, DecodeObject([]byte(object)))
+						}
+					}
+
+					resp.BucketOpRes.Objects = objectList
+					resp.ErrCode = pb.ErrCode_NO_ERR
+				}
+
+				s.lastApplied = int(applyMsg.CommandIndex)
+				//when raft logs are too large, take a snapshot
+				if s.r.GetLogCounts() > 20 {
+					s.takeSnapshot(s.lastApplied)
+				}
+				//notify the response channel
+				s.mu.Lock()
 				ch := s.getRespNotifyChannel(applyMsg.GetCommandIndex())
+				s.mu.Unlock()
 				ch <- resp
 			} else if applyMsg.SnapshotValid {
 				s.mu.Lock()
