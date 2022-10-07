@@ -16,10 +16,8 @@ import (
 	"time"
 )
 
-//
 // MetaServer
 // @Description: MetaServer
-//
 type MetaServer struct {
 	mu sync.Mutex
 	r  *raft.Raft
@@ -39,10 +37,8 @@ type MetaServer struct {
 	pb.UnimplementedMetaServiceServer
 }
 
-//
 // NewMetaServer
 // @Description: NewMetaServer
-//
 func NewMetaServer(nodes map[int]string, nodeID int, dataPath string) *MetaServer {
 
 	var clientEnds []*raft.RaftClientEnd
@@ -75,10 +71,8 @@ func NewMetaServer(nodes map[int]string, nodeID int, dataPath string) *MetaServe
 	return metaServer
 }
 
-//
 // RequestVote
 // @Description: 处理其他meta server的投票请求
-//
 func (s *MetaServer) RequestVote(ctx context.Context, request *pb.RequestVoteReq) (*pb.RequestVoteResp, error) {
 	resp := &pb.RequestVoteResp{}
 	log.Log.Debugf("receive request vote:%v\n", request)
@@ -87,10 +81,8 @@ func (s *MetaServer) RequestVote(ctx context.Context, request *pb.RequestVoteReq
 	return resp, nil
 }
 
-//
 // AppendEntries
 // @Description: 处理其他meta server的日志同步请求
-//
 func (s *MetaServer) AppendEntries(ctx context.Context, request *pb.AppendEntriesReq) (*pb.AppendEntriesResp, error) {
 	resp := &pb.AppendEntriesResp{}
 	log.Log.Debugf("receive append entries:%v\n", request)
@@ -99,10 +91,8 @@ func (s *MetaServer) AppendEntries(ctx context.Context, request *pb.AppendEntrie
 	return resp, nil
 }
 
-//
 // Snapshot
 // @Description: 处理其他meta server的快照安装请求
-//
 func (s *MetaServer) Snapshot(ctx context.Context, request *pb.InstallSnapshotReq) (*pb.InstallSnapshotResp, error) {
 	resp := &pb.InstallSnapshotResp{}
 	log.Log.Debugf("receive snapshot:%v\n", request)
@@ -111,10 +101,8 @@ func (s *MetaServer) Snapshot(ctx context.Context, request *pb.InstallSnapshotRe
 	return resp, nil
 }
 
-//
 // ServerGroupMeta
 // @Description: 处理server group meta
-//
 func (s *MetaServer) ServerGroupMeta(ctx context.Context, req *pb.ServerGroupMetaConfigRequest) (*pb.ServerGroupMetaConfigResponse, error) {
 	log.Log.Debugf("receive server group meta request:%v\n", req)
 	resp := &pb.ServerGroupMetaConfigResponse{}
@@ -148,10 +136,8 @@ func (s *MetaServer) ServerGroupMeta(ctx context.Context, req *pb.ServerGroupMet
 	return resp, nil
 }
 
-//
 // getRespNotifyChannel
 // @Description: 获取响应通知channel
-//
 func (s *MetaServer) getRespNotifyChannel(index int64) chan *pb.ServerGroupMetaConfigResponse {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -161,27 +147,25 @@ func (s *MetaServer) getRespNotifyChannel(index int64) chan *pb.ServerGroupMetaC
 	return s.notifyChs[index]
 }
 
-//
 // restoreSnapshot
 // @Description: restore snapshot
-//
 func (s *MetaServer) restoreSnapshot(snapshot []byte) {
 	if snapshot == nil {
 		return
 	}
 	buffer := bytes.NewBuffer(snapshot)
 	decoder := gob.NewDecoder(buffer)
-	if err := decoder.Decode(&s.configSTM); err != nil {
+	var configSTM map[string]string
+	if err := decoder.Decode(&configSTM); err != nil {
 		log.Log.Errorf("decode snapshot error:%v", err)
 	}
 	jsonSTM, _ := json.Marshal(s.configSTM)
 	log.Log.Debugf("restore snapshot:%s", string(jsonSTM))
+	s.configSTM = configSTM
 }
 
-//
 // takeSnapshot
 // @Description: take snapshot
-//
 func (s *MetaServer) takeSnapshot(index int) {
 	var byteBuffer bytes.Buffer
 	encoder := gob.NewEncoder(&byteBuffer)
@@ -191,10 +175,8 @@ func (s *MetaServer) takeSnapshot(index int) {
 	s.r.Snapshot(index, byteBuffer.Bytes())
 }
 
-//
 // ApplyToSTM
 // @Description: apply协程，处理apply消息
-//
 func (s *MetaServer) ApplyToSTM(stopApplyCh <-chan interface{}) {
 	for {
 		//等待apply消息
