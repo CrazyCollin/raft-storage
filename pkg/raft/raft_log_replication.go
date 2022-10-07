@@ -7,10 +7,8 @@ import (
 	"sort"
 )
 
-//
 // Propose
-// @Description: 处理
-//
+// @Description: 提交日志
 func (r *Raft) Propose(payload []byte) (logIndex int, term int, isAccepted bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -23,10 +21,8 @@ func (r *Raft) Propose(payload []byte) (logIndex int, term int, isAccepted bool)
 	return int(newEntry.GetIndex()), int(newEntry.GetTerm()), true
 }
 
-//
 // AppendLogEntry
 // @Description: 本地追加entry
-//
 func (r *Raft) AppendLogEntry(payload []byte) *pb.Entry {
 	lastLogEntry := r.logs.GetLastEntry()
 	newEntry := &pb.Entry{
@@ -42,10 +38,8 @@ func (r *Raft) AppendLogEntry(payload []byte) *pb.Entry {
 	return newEntry
 }
 
-//
 // Broadcast
 // @Description: 用于广播append信息(false)或者是心跳保持(true)
-//
 func (r *Raft) Broadcast(isHeartbeat bool) {
 	for _, peer := range r.peers {
 		if int(peer.id) == r.me {
@@ -62,10 +56,8 @@ func (r *Raft) Broadcast(isHeartbeat bool) {
 	}
 }
 
-//
 // Replicator
 // @Description: log replication的协程
-//
 func (r *Raft) Replicator(peer *RaftClientEnd) {
 	r.replicatorCond[peer.Id()].L.Lock()
 	defer r.replicatorCond[peer.Id()].L.Unlock()
@@ -80,10 +72,8 @@ func (r *Raft) Replicator(peer *RaftClientEnd) {
 	}
 }
 
-//
 // replicateOneRound
 // @Description: 从leader复制log至follower，用于心跳检测和log replication
-//
 func (r *Raft) replicateOneRound(peer *RaftClientEnd) {
 	r.mu.RLock()
 	//角色不是leader，返回
@@ -205,10 +195,8 @@ func (r *Raft) HandleAppendEntries(req *pb.AppendEntriesReq, resp *pb.AppendEntr
 	resp.Term, resp.Success = r.currTerm, true
 }
 
-//
 // ManageLeaderCommitIndex
 // @Description: 根据复制进度处理提交
-//
 func (r *Raft) ManageLeaderCommitIndex() {
 	matchIdx := r.matchIdx
 	sort.Ints(matchIdx)
@@ -224,10 +212,8 @@ func (r *Raft) ManageLeaderCommitIndex() {
 
 }
 
-//
 // ManageFollowerCommitIndex
 // @Description: 处理follower的commit
-//
 func (r *Raft) ManageFollowerCommitIndex(leaderCommit int64) {
 	commitIdx := Min(int(leaderCommit), int(r.logs.lastIdx))
 	if commitIdx > int(r.commitIdx) {
@@ -241,10 +227,8 @@ func (r *Raft) MatchLog(index, term int64) bool {
 	return index >= int64(r.logs.firstIdx) && index <= int64(r.logs.lastIdx) && uint64(term) == r.logs.GetEntry(index).GetTerm()
 }
 
-//
 // InitAppendEntriesReq
 // @Description: 构造append entries请求
-//
 func (r *Raft) InitAppendEntriesReq(prevLogIndex uint64) *pb.AppendEntriesReq {
 	//获取entries
 	entries := make([]*pb.Entry, r.logs.GetLastLogID()-prevLogIndex)

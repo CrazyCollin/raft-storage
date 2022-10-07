@@ -2,6 +2,7 @@ package blockserver
 
 import (
 	"bytes"
+	"context"
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	pb "rstorage/pkg/protocol"
 	"rstorage/pkg/raft"
 	"sync"
+	"time"
 )
 
 type BlockServer struct {
@@ -59,6 +61,64 @@ func NewBlockServer(nodes map[int]string, nodeID int, groupID int, dataPath stri
 	blockServer.restoreSnapshot(r.ReadSnapshot())
 	go blockServer.ApplyingToSTM(blockServer.stopApplyCh)
 	return blockServer
+}
+
+func (s *BlockServer) RequestVote(ctx context.Context, req *pb.RequestVoteReq) (*pb.RequestVoteResp, error) {
+	resp := &pb.RequestVoteResp{}
+	log.Log.Debugf("block server %d receive request vote from %d\n", s.id, req.CandidateId)
+	s.r.HandleRequestVote(req, resp)
+	log.Log.Debugf("block server %d response request vote to %d\n", s.id, req.CandidateId)
+	return resp, nil
+}
+
+func (s *BlockServer) AppendEntries(ctx context.Context, req *pb.AppendEntriesReq) (*pb.AppendEntriesResp, error) {
+	resp := &pb.AppendEntriesResp{}
+	log.Log.Debugf("block server %d receive append entries from %d\n", s.id, req.LeaderId)
+	s.r.HandleAppendEntries(req, resp)
+	log.Log.Debugf("block server %d response append entries to %d\n", s.id, req.LeaderId)
+	return resp, nil
+}
+
+func (s *BlockServer) Snapshot(ctx context.Context, req *pb.InstallSnapshotReq) (*pb.InstallSnapshotResp, error) {
+	resp := &pb.InstallSnapshotResp{}
+	log.Log.Debugf("block server %d receive snapshot from %d\n", s.id, req.LeaderId)
+	s.r.HandleInstallSnapshot(req, resp)
+	log.Log.Debugf("block server %d response snapshot to %d\n", s.id, req.LeaderId)
+	return resp, nil
+}
+
+// FileBlockOp
+// @Description: file block操作
+func (s *BlockServer) FileBlockOp(ctx context.Context, req *pb.FileBlockOpRequest) (*pb.FileBlockOpResponse, error) {
+	resp := &pb.FileBlockOpResponse{}
+	encodedRequest := EncodeBlockServerRequest(req)
+	lastLogIndex, _, isLeader := s.r.Propose(encodedRequest)
+	if !isLeader {
+		resp.ErrCode = pb.ErrCode_WRONG_LEADER_ERR
+		resp.LeaderId = s.r.GetLeaderID()
+		return resp, nil
+	}
+
+	s.mu.Lock()
+	ch := s.getRespNotifyChannel(int64(lastLogIndex))
+	s.mu.Unlock()
+
+	select {
+	case res := <-ch:
+		resp.BlockContent = res.BlockContent
+		resp.ErrCode = res.ErrCode
+		resp.LeaderId = res.LeaderId
+	case <-time.After(time.Second * 10):
+		resp.ErrCode = pb.ErrCode_RPC_CALL_TIMEOUT_ERR
+	}
+
+	go func() {
+		s.mu.Lock()
+		delete(s.notifyChs, int64(lastLogIndex))
+		s.mu.Unlock()
+	}()
+
+	return resp, nil
 }
 
 // getRespNotifyChannel
