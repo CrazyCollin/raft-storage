@@ -4,6 +4,12 @@ const INIT_LOG_INDEX = 0
 
 const SLOT_NUM = 10
 
+const FILE_BLOCK_SIZE = 1024 * 1024 * 1
+
+const FILE_BLOCK_SIZE_2MB = 1024 * 1024 * 2
+
+const FILE_BLOCK_SIZE_4MB = 1024 * 1024 * 4
+
 var BUCKET_META_PREFIX = []byte{0x01, 0x09, 0x09, 0x08}
 
 var OBJECT_META_PREFIX = []byte{0x01, 0x09, 0x09, 0x05}
