@@ -85,6 +85,40 @@ func (r *Raft) replicateOneRound(peer *RaftClientEnd) {
 	prevLogIndex := uint64(r.nextIdx[peer.Id()] - 1)
 	if prevLogIndex < r.logs.GetFirstLogID() {
 		//todo 发送快照
+		firstLogEntry := r.logs.GetFirstEntry()
+		// init snapshot request
+		snapshotReq := &pb.InstallSnapshotReq{
+			Term:              r.currTerm,
+			LeaderId:          int64(r.me),
+			LastIncludedIndex: firstLogEntry.GetIndex(),
+			LastIncludedTerm:  int64(firstLogEntry.GetTerm()),
+			Data:              r.ReadSnapshot(),
+		}
+		// send snapshot request
+		r.mu.RUnlock()
+		log.Log.Debugf("start send snapshot to %d\n", peer.id)
+		snapshotResp, err := (*peer.raftServiceCli).Snapshot(context.Background(), snapshotReq)
+		if err != nil {
+			log.Log.Debugf("send snapshot to %d failed\n", peer.id)
+		}
+		r.mu.Lock()
+		log.Log.Debugf("receive snapshot response from %d\n", peer.id)
+		if snapshotResp != nil {
+			if r.role == LEADER && r.currTerm == snapshotReq.GetTerm() {
+				if snapshotResp.GetTerm() > r.currTerm {
+					// change role into follower
+					r.SwitchRole(FOLLOWER)
+					//todo
+					r.currTerm = snapshotResp.GetTerm()
+					r.voteFor = None
+					r.PersistState()
+				} else {
+					r.matchIdx[peer.Id()] = Max(int(snapshotReq.LastIncludedIndex), r.matchIdx[peer.Id()])
+					r.nextIdx[peer.Id()] = r.matchIdx[peer.Id()] + 1
+				}
+			}
+		}
+		r.mu.Unlock()
 	} else {
 		firstIndex := r.logs.firstIdx
 		//构造请求
